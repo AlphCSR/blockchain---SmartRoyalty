@@ -1,0 +1,16 @@
+{
+    "name": "smart-royalty-contracts",
+    "version": "1.0.0",
+    "description": "Smart Contracts for SmartRoyalty",
+    "main": "index.js",
+    "scripts": {
+        "test": "hardhat test"
+    },
+    "devDependencies": {
+        "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+        "hardhat": "^2.22.0"
+    },
+    "dependencies": {
+        "@openzeppelin/contracts": "^4.9.3"
+    }
+}

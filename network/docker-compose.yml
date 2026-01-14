@@ -1,0 +1,85 @@
+version: '3.4'
+
+networks:
+  besu_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.16.238.0/24
+
+services:
+  validator1:
+    image: hyperledger/besu:latest
+    environment:
+      - BESU_PUBLIC_KEY_DIRECTORY=/opt/besu/keys
+    volumes:
+      - ./networkFiles/genesis.json:/opt/besu/genesis.json
+      - ./networkFiles/keys/0x0edd7cf3bc73a65c3765b769259ffb2ee1f30617:/opt/besu/keys
+      - ./data/validator1:/opt/besu/data
+    command:
+      - --genesis-file=/opt/besu/genesis.json
+      - --node-private-key-file=/opt/besu/keys/key
+      - --rpc-http-enabled
+      - --rpc-http-api=ETH,NET,IBFT,WEB3,MINER,ADMIN,TXPOOL
+      - --rpc-http-cors-origins="*"
+      - --host-allowlist="*"
+      - --min-gas-price=0
+    ports:
+      - 8545:8545
+    networks:
+      besu_network:
+        ipv4_address: 172.16.238.10
+
+  validator2:
+    image: hyperledger/besu:latest
+    volumes:
+      - ./networkFiles/genesis.json:/opt/besu/genesis.json
+      - ./networkFiles/keys/0x1b0c8df33cb762110ab48277f631456f6b025a72:/opt/besu/keys
+      - ./data/validator2:/opt/besu/data
+    command:
+      - --genesis-file=/opt/besu/genesis.json
+      - --node-private-key-file=/opt/besu/keys/key
+      - --p2p-port=30303
+      - --bootnodes=enode://d299ce39515401e9f74b2e892d80b2ddb848a01d082b102027f6ef7de900309647a2d8846d2c537b4cafc0d215b2b98c855f86726256c161ba9552223b3f3472@172.16.238.10:30303
+      - --min-gas-price=0
+    depends_on:
+      - validator1
+    networks:
+      besu_network:
+        ipv4_address: 172.16.238.11
+
+  validator3:
+    image: hyperledger/besu:latest
+    volumes:
+      - ./networkFiles/genesis.json:/opt/besu/genesis.json
+      - ./networkFiles/keys/0x7f96538a8225c9f1715514684deb518b371083f6:/opt/besu/keys
+      - ./data/validator3:/opt/besu/data
+    command:
+      - --genesis-file=/opt/besu/genesis.json
+      - --node-private-key-file=/opt/besu/keys/key
+      - --p2p-port=30303
+      - --bootnodes=enode://d299ce39515401e9f74b2e892d80b2ddb848a01d082b102027f6ef7de900309647a2d8846d2c537b4cafc0d215b2b98c855f86726256c161ba9552223b3f3472@172.16.238.10:30303
+      - --min-gas-price=0
+    depends_on:
+      - validator1
+    networks:
+      besu_network:
+        ipv4_address: 172.16.238.12
+
+  validator4:
+    image: hyperledger/besu:latest
+    volumes:
+      - ./networkFiles/genesis.json:/opt/besu/genesis.json
+      - ./networkFiles/keys/0xe450f065b0c36bf545ae6ae2fdddad0709bf866b:/opt/besu/keys
+      - ./data/validator4:/opt/besu/data
+    command:
+      - --genesis-file=/opt/besu/genesis.json
+      - --node-private-key-file=/opt/besu/keys/key
+      - --p2p-port=30303
+      - --bootnodes=enode://d299ce39515401e9f74b2e892d80b2ddb848a01d082b102027f6ef7de900309647a2d8846d2c537b4cafc0d215b2b98c855f86726256c161ba9552223b3f3472@172.16.238.10:30303
+      - --min-gas-price=0
+    depends_on:
+      - validator1
+    networks:
+      besu_network:
+        ipv4_address: 172.16.238.13
