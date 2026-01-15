@@ -36,9 +36,14 @@ function App() {
     setToasts(prev => prev.filter(t => t.id !== id));
   }
 
-  // --- CUSTOM HOOKS ---
+  // --- HOOKS PERSONALIZADOS ---
+  // Gestión de conexión de billetera (MetaMask)
   const { account, factoryContract, connectWallet, disconnectWallet } = useWallet(addToast);
+
+  // Gestión de carga de archivos a IPFS (Pinata)
   const { isUploading, musicCID, coverCID, uploadToIPFS, uploadJSONToIPFS, resetIPFS } = useIPFS(addToast);
+
+  // Lógica principal de negocio en la Blockchain
   const {
     distributors, totalVolume, myRoyalties, recentActivity, isLoading: blockchainLoading,
     fetchDistributors, supportArtist, claimRoyalties, purchaseAlbum, purchaseLicense
@@ -121,6 +126,10 @@ function App() {
     fetchExplorerData();
   }, [selectedContract]);
 
+  /**
+   * @dev Despliega un nuevo álbum en la Blockchain.
+   * Coordina los metadatos de IPFS con los parámetros del Smart Contract.
+   */
   const deployAlbum = async (data) => {
     if (!factoryContract) return false;
     try {
@@ -135,19 +144,21 @@ function App() {
         data.collaborators.map(c => c.share),
         {
           gasLimit: 5000000,
-          gasPrice: 0n
+          gasPrice: 0n // Específico para Hyperledger Besu si aplica
         }
       );
-      addToast("Deploying to Ledger...", "loading");
+      addToast("Implementando en la Red...", "loading");
       await tx.wait();
-      addToast("Success! Global Distribution Active.", "success");
+      addToast("¡Éxito! Distribución Global Activada.", "success");
+
+      // Refrescar datos globales
       fetchDistributors();
       setActiveTab("dashboard");
       resetIPFS();
       return true;
     } catch (error) {
-      console.error("Deploy Error:", error);
-      addToast("Deployment Failed", "error");
+      console.error("Error en Despliegue:", error);
+      addToast("Error al desplegar contrato", "error");
       return false;
     }
   };

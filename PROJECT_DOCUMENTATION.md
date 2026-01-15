@@ -37,37 +37,38 @@ SmartRoyalty es una plataforma descentralizada (DApp) construida sobre la red **
 El sistema integra tres actores: **Artista**, **Fan (Consumidor)** y **Licenciatario (Comercial)**.
 
 ```mermaid
-usecaseDiagram
-    actor "Artista" as Artist
-    actor "Fan / Coleccionista" as Fan
-    actor "Licenciatario Comercial" as Business
-    participant "SmartRoyalty DApp" as System
+graph LR
+    subgraph Actores
+        A[Artista]
+        F[Fan / Coleccionista]
+        B[Licenciatario Comercial]
+    end
 
-    package "Release Studio" {
-        usecase "Crear Álbum" as UC1
-        usecase "Definir Precio Personal y Comercial" as UC2
-        usecase "Desplegar Contrato" as UC4
-    }
+    subgraph "Release Studio"
+        UC1([Crear Álbum])
+        UC2([Definir Precios])
+        UC4([Desplegar Contrato])
+    end
 
-    package "Marketplace" {
-        usecase "Comprar Álbum (Uso Personal)" as UC7
-        usecase "Adquirir Licencia Comercial" as UC11
-        usecase "Descargar Certificado de Uso" as UC12
-    }
+    subgraph "Marketplace"
+        UC7([Comprar Álbum])
+        UC11([Adquirir Licencia])
+        UC12([Descargar Certificado])
+    end
 
-    package "Dashboard" {
-        usecase "Reclamar Royalties (Ventas + Licencias)" as UC9
-    }
+    subgraph "Dashboard"
+        UC9([Reclamar Royalties])
+    end
 
-    Artist --> UC1
-    Artist --> UC2
-    Artist --> UC4
-    Artist --> UC9
+    A --- UC1
+    A --- UC2
+    A --- UC4
+    A --- UC9
 
-    Fan --> UC7
+    F --- UC7
     
-    Business --> UC11
-    Business --> UC12
+    B --- UC11
+    B --- UC12
 ```
 
 ---
@@ -218,17 +219,49 @@ npm run dev
 
 ---
 
-## 7. Estructura de Carpetas
+## 8. Explicación Detallada de Módulos y Código
 
-*   `contracts/`
-    *   `contracts/`: Código fuente Solidity.
-    *   `scripts/`: Scripts de mantenimiento (deploy, fundUser).
-    *   `test/`: Tests automatizados.
-*   `frontend/`
-    *   `src/components/`: Componentes React modulares (Dashboard, Studio, Marketplace).
-    *   `src/hooks/`: Lógica de negocio reutilizable (`useBlockchain`, `useIPFS`).
-    *   `src/artifacts/`: ABIs de los contratos para conectar el frontend.
+### 8.1. Contrato Fábrica (`RoyaltyFactory.sol`)
+Este módulo es el punto de entrada para la creación de nuevos activos en la red.
+- **Función `createRoyaltyDistributor`**: Actúa como un *template manager*. Al llamarla, despliega una nueva instancia de `RoyaltyDistributor` pasando los parámetros del álbum (nombre, artista, precio, etc.).
+- **Almacenamiento**: Mantiene un `address[] public deployedContracts` que permite al frontend iterar y mostrar todos los álbumes existentes sin necesidad de una base de datos centralizada.
+
+### 8.2. Contrato de Distribución (`RoyaltyDistributor.sol`)
+Este es el componente más crítico. Hereda de `PaymentSplitter` de OpenZeppelin, lo que garantiza que la lógica de reparto de dinero sea segura y auditada.
+- **Lógica de Ventas**: Define funciones como `purchaseAlbum()` que verifican que el pago coincida con el precio establecido antes de otorgar permisos.
+- **Gestión de Licencias**: Mantiene un registro (`mapping`) de quién ha comprado derechos comerciales, emitiendo eventos que el frontend captura para generar certificados.
+
+### 8.3. Hook de Conexión (`useBlockchain.js`)
+Es la capa de abstracción entre React y la Blockchain.
+- **Sincronización de Estado**: Utiliza `useEffect` y `useCallback` para mantener la UI actualizada con los últimos saldos y eventos de la red.
+- **Manejo de Proveedores**: Detecta automáticamente si el usuario tiene MetaMask (u otro wallet) inyectado en el navegador.
 
 ---
 
-*Generado automáticamente por Antigravity AI Assistant.*
+## 9. Flujo de Funcionamiento (Casos de Uso)
+
+### Caso de Uso: Lanzamiento de Contenido (Artista)
+*   **Actor**: Artista.
+*   **Pre-condición**: Tener archivos de audio y wallet con fondos para gas.
+1.  El artista interactúa con el **Studio Wizard**.
+2.  El sistema sube los archivos a **Pinata (IPFS)**.
+3.  El artista confirma la transacción de despliegue.
+4.  **Resultado**: Se crea un nuevo Smart Contract inmutable que gestionará sus ingresos para siempre.
+
+### Caso de Uso: Adquisición de Licencia (Empresa/B2B)
+*   **Actor**: Licenciatario Comercial.
+1.  Busca un álbum en el **Marketplace**.
+2.  Selecciona la opción "Commercial License".
+3.  El sistema calcula el precio premium y solicita la firma del pago.
+4.  Al confirmarse, la Blockchain emite un evento de "LicensePurchased".
+5.  El frontend genera un **Certificado Digital de Autenticidad** único.
+
+---
+
+## 10. Conclusiones y Recomendaciones para la Exposición
+Al presentar el proyecto, se recomienda enfatizar:
+1.  **Inmutabilidad**: Una vez que el álbum está en la red, nadie (ni siquiera los desarrolladores) puede cambiar los porcentajes de pago.
+2.  **Descentralización**: La aplicación funciona 24/7 sin servidores centrales.
+3.  **Transparencia**: El balance de ventas es público y auditable por cualquier colaborador.
+
+*Actualizado por Antigravity AI - Enero 2026*

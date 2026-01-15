@@ -5,17 +5,23 @@ pragma solidity ^0.8.24;
 import "@openzeppelin/contracts/finance/PaymentSplitter.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
+/**
+ * @title RoyaltyDistributor
+ * @dev Maneja la venta de álbumes y la distribución automática de ingresos entre colaboradores.
+ * Hereda de PaymentSplitter para un reparto justo y seguro de fondos.
+ */
 contract RoyaltyDistributor is PaymentSplitter, ReentrancyGuard {
+    // Metadatos del álbum almacenados en la blockchain
     string public albumName;
     string public artistName;
-    string public musicCID; // IPFS Hash for audio file
-    string public coverCID; // IPFS Hash for cover art
-    uint256 public albumPrice;
-    uint256 public commercialPrice; // Price for commercial use license
+    string public musicCID; // Hash de IPFS para los archivos de audio
+    string public coverCID; // Hash de IPFS para el arte de portada
+    uint256 public albumPrice; // Precio para acceso personal
+    uint256 public commercialPrice; // Precio para licencia de uso comercial
     
-    address[] private _allPayees;
-    mapping(address => bool) public purchasers;
-    mapping(address => bool) public commercialLicenses; // Tracks commercial rights
+    address[] private _allPayees; // Lista interna de beneficiarios
+    mapping(address => bool) public purchasers; // Registro de compradores personales
+    mapping(address => bool) public commercialLicenses; // Registro de dueños de derechos comerciales
 
     event AlbumPurchased(address indexed buyer, uint256 amount);
     event LicensePurchased(address indexed buyer, uint256 amount);
@@ -39,13 +45,18 @@ contract RoyaltyDistributor is PaymentSplitter, ReentrancyGuard {
         _allPayees = payees;
     }
 
+    /**
+     * @dev Permite a un usuario comprar el álbum para uso personal.
+     * Al recibir el pago, distribuye los fondos automáticamente entre los colaboradores.
+     */
     function purchaseAlbum() external payable {
-        require(msg.value >= albumPrice, "Marketplace: Insufficient ETH sent");
-        require(!purchasers[msg.sender], "Marketplace: Album already purchased");
+        require(msg.value >= albumPrice, "Marketplace: Fondos insuficientes");
+        require(!purchasers[msg.sender], "Marketplace: El album ya fue comprado por esta cuenta");
         
         purchasers[msg.sender] = true;
         
-        // Auto-Payout logic (Push Model)
+        // Lógica de Pago Automático (Modelo Push)
+        // Libera los fondos inmediatamente a todos los colaboradores
         for (uint256 i = 0; i < _allPayees.length; i++) {
             release(payable(_allPayees[i]));
         }
@@ -53,17 +64,22 @@ contract RoyaltyDistributor is PaymentSplitter, ReentrancyGuard {
         emit AlbumPurchased(msg.sender, msg.value);
     }
 
+    /**
+     * @dev Permite a una entidad comprar una licencia de uso comercial.
+     * Otorga derechos comerciales y también acceso personal si no lo tenía.
+     */
     function purchaseLicense() external payable {
-        require(msg.value >= commercialPrice, "Marketplace: Insufficient ETH for license");
-        require(!commercialLicenses[msg.sender], "Marketplace: License already acquired");
+        require(msg.value >= commercialPrice, "Marketplace: Fondos insuficientes para licencia");
+        require(!commercialLicenses[msg.sender], "Marketplace: Licencia ya adquirida");
         
         commercialLicenses[msg.sender] = true;
-        // Grant personal access as well if they buy the license
+        
+        // Otorgar acceso personal si es la primera vez que interactúa
         if(!purchasers[msg.sender]) {
             purchasers[msg.sender] = true;
         }
         
-        // Auto-Payout logic
+        // Distribución automática de los fondos de la licencia
         for (uint256 i = 0; i < _allPayees.length; i++) {
             release(payable(_allPayees[i]));
         }
@@ -71,8 +87,11 @@ contract RoyaltyDistributor is PaymentSplitter, ReentrancyGuard {
         emit LicensePurchased(msg.sender, msg.value);
     }
 
+    /**
+     * @dev Verifica si una dirección tiene acceso al contenido.
+     */
     function hasPurchased(address _account) public view returns (bool) {
-        if (albumPrice == 0) return true;
+        if (albumPrice == 0) return true; // Contenido gratuito
         return purchasers[_account];
     }
 }

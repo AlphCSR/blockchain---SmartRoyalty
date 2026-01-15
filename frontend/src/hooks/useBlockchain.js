@@ -9,11 +9,16 @@ export const useBlockchain = (factoryContract, account, addToast) => {
     const [recentActivity, setRecentActivity] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
 
+    /**
+     * @dev Recupera todos los contratos desplegados y sus estados actuales.
+     * Calcula volúmenes, regalías acumuladas y actividad reciente.
+     */
     const fetchDistributors = useCallback(async () => {
         if (!factoryContract) return;
 
         setIsLoading(true);
         try {
+            // Obtener lista de direcciones desde la fábrica
             const deployed = await factoryContract.getDeployedContracts();
             const provider = factoryContract.runner.provider;
             let volumeAccumulator = 0n;
@@ -23,10 +28,11 @@ export const useBlockchain = (factoryContract, account, addToast) => {
             let globalEvents = [];
 
             for (const addr of (deployed || [])) {
-                // Ensure address is a valid hex string before passing to Contract to avoid ENS resolution attempts
                 if (!addr || !ethers.isAddress(addr) || addr === ethers.ZeroAddress) continue;
                 try {
                     const contract = new ethers.Contract(addr, RoyaltyDistributorABI.abi, provider);
+
+                    // Consulta masiva de datos del contrato
                     const [name, artist, music, cover, price, balance, commPrice] = await Promise.all([
                         contract.albumName(),
                         contract.artistName(),
@@ -37,13 +43,14 @@ export const useBlockchain = (factoryContract, account, addToast) => {
                         contract.commercialPrice()
                     ]);
 
-                    // volumeAccumulator += balance; // Old way: only counted holding balance
+                    volumeAccumulator += balance;
 
-                    // New way: Fetch total historical volume from ALL revenue sources
+                    // Filtros para eventos de pago y compra
                     const paymentFilter = contract.filters.PaymentReceived();
                     const albumFilter = contract.filters.AlbumPurchased();
                     const licenseFilter = contract.filters.LicensePurchased();
 
+                    // Rango de bloques para buscar eventos (limitado para rendimiento)
                     const currentBlock = await provider.getBlockNumber();
                     const fromBlock = Math.max(0, currentBlock - 1000);
 
@@ -53,19 +60,20 @@ export const useBlockchain = (factoryContract, account, addToast) => {
                         contract.queryFilter(licenseFilter, fromBlock).catch(() => [])
                     ]);
 
+                    // Cálculo de ingresos históricos
                     const revenue1 = paymentEvents.reduce((acc, ev) => acc + ev.args.amount, 0n);
                     const revenue2 = albumEvents.reduce((acc, ev) => acc + ev.args.amount, 0n);
                     const revenue3 = licenseEvents.reduce((acc, ev) => acc + ev.args.amount, 0n);
 
                     volumeAccumulator += (revenue1 + revenue2 + revenue3);
 
-                    // Fetch recent events for this contract with error handling for RPC range limits
+                    // Recuperar actividad reciente para el feed global
                     let events = [];
                     try {
                         const filter = contract.filters.AlbumPurchased();
                         events = await contract.queryFilter(filter, fromBlock).catch(() => []);
                     } catch (err) {
-                        console.error("Failed to fetch events for", addr, err);
+                        console.error("Error al obtener eventos para", addr, err);
                     }
 
                     const mappedEvents = await Promise.all(events.map(async ev => {
@@ -73,7 +81,7 @@ export const useBlockchain = (factoryContract, account, addToast) => {
                         try {
                             const block = await provider.getBlock(ev.blockNumber);
                             if (block) txTimestamp = block.timestamp * 1000;
-                        } catch (e) { /* fallback to now */ }
+                        } catch (e) { /* fallback a tiempo actual */ }
 
                         return {
                             type: 'purchase',
@@ -88,6 +96,7 @@ export const useBlockchain = (factoryContract, account, addToast) => {
                     }));
                     globalEvents = [...globalEvents, ...mappedEvents];
 
+                    // Verificar permisos del usuario actual
                     let purchased = false;
                     if (account) {
                         purchased = await contract.hasPurchased(account);
@@ -112,6 +121,7 @@ export const useBlockchain = (factoryContract, account, addToast) => {
                     };
                     allDistributors.push(distData);
 
+                    // Verificar si el usuario es colaborador y tiene regalías por cobrar
                     if (account) {
                         const share = await contract.shares(account);
                         if (share > 0n) {
@@ -128,7 +138,7 @@ export const useBlockchain = (factoryContract, account, addToast) => {
                         }
                     }
                 } catch (e) {
-                    console.error("Error checking contract:", addr, e);
+                    console.error("Error al verificar contrato:", addr, e);
                 }
             }
 
@@ -137,7 +147,7 @@ export const useBlockchain = (factoryContract, account, addToast) => {
             setMyRoyalties(matches);
             setRecentActivity(globalEvents.sort((a, b) => b.timestamp - a.timestamp).slice(0, 10));
         } catch (error) {
-            console.error("Error fetching distributors:", error);
+            console.error("Error al obtener distribuidores:", error);
         } finally {
             setIsLoading(false);
         }
